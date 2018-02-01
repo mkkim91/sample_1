@@ -1,0 +1,611 @@
+#define BACK_COLOR 	BLACK
+//#define BACK_COLOR 	WHITE
+#define WIDTH 		320
+#define HEIGHT 		240
+
+struct Object   //¹è¿­ Ã³·³ ¹­¾î¼­ -> ±¸Á¶Ã¼
+{
+	int timer;
+	int move_flag;
+	int pos[2];
+	int pos_init[2]; //ÃÊ±â
+	int pos_back[2]; //X,Y ÀÇ ÀÌÀü ÁÂÇ¥ °ª (pre-x, pre-y °ª)
+	int size[2];
+	unsigned short color;
+	int speed_step;
+	int move_step;
+};
+
+//game images
+
+#include "./Image/titles.h"
+#include "./Image/gameover.h"
+#include "./Image/youwin.h"
+#include "./Image/tankp.h"
+
+//ufo colors
+#include "./Image/ufo2pk.h"
+#include "./Image/ufo2ong.h"
+#include "./Image/ufo2bl.h"
+#include "./Image/ufo2grn.h"
+#include "./Image/ufogrn.h"
+#include "./Image/ufobl.h"
+#include "./Image/ufoye.h"
+#include "./Image/ufore.h"
+
+//ufo game array
+
+const unsigned short * Ufoim[] = {ufore, ufobl, ufoye, ufogrn};
+const unsigned short * Ufo2im[] = {ufo2pk, ufo2grn, ufo2ong, ufo2bl};
+
+
+//project
+
+#include<stdlib.h>
+
+void Drawufo(void);
+void Game_Init(void);
+void Moveufo(void);
+void ufoini(void);
+
+//game over
+int gameov=0;
+
+//game win
+int gamewin=0;
+
+//score
+int score=0;
+
+//tank
+
+int move_flag=1;
+int now[2]={10,210};
+int now_ini[2]={10,210}; //ÃÊ±â
+int now_pre[2] = {10,210}; //X,Y ÀÇ ÀÌÀü ÁÂÇ¥ °ª (pre-x, pre-y °ª)
+int size[2] = {20,20};
+int move_step=20;
+int life=3;
+
+//this is for shooting missile
+
+int stimer=1;
+int smoveflag=0;
+int spos[2]={10,210 } ;
+int sini[2]={10,210};
+int sprepose[2]={10,210 };
+int ssiz[2]={2,5};
+unsigned short scolor=WHITE;
+int sspeed=2;
+int smovestep=20;
+int scnt=0;
+int shoot=50; //number of missiles that I have to shoot
+
+//Ufo
+struct Object Ufo = {0,1,{0,10},{0,10},{0,10},{30,10},RED, 3, 25};
+int ufomoveit=0;
+int ufomoveit2=0;
+int lifeufo=3;
+
+//Ufo #2
+
+struct Object Ufo2 = {0,1,{0,10},{0,10},{0,10},{20,10},RED, 5, 20};
+int ufo2moveit=0;
+int ufo2moveit2=0;
+int lifeufo2=1;
+
+
+//Ufo1 and 2 images (¹è¿­ Àú~±â~ À§¿¡ ¸¸µé¾îµÒ)
+int a=0; //to make the colors change in  Ufoim[] and Ufo2im[]
+int b=0;
+
+//this is my "main"
+
+void My_Test(void)
+{
+
+	//while((Key_Wait_Key_Pressed()))
+	Lcd_Draw_BMP(0,0, titles);
+
+	(Key_Wait_Key_Pressed());
+
+	Lcd_Printf(1,1,RED,BLUE,1,1, "LIFE %d", life);
+	Lcd_Printf(200,2,RED,BLUE,1,1, "MISSILES %d", shoot);
+	Lcd_Printf(100,2,RED,BLUE,1,1, "SCORE %d", score);
+
+	Game_Init();
+	Drawufo();
+
+	for(;;)
+	{
+		Moveufo();
+		Drawufo();
+		if (gameov==1)
+		{
+			Lcd_Draw_BMP(0,0, gameover);
+			Timer3_Buzzer_Beep(D1_,N4);
+			Timer3_Buzzer_Beep(D1,N4);
+			Timer3_Buzzer_Beep(C1,N4);
+			gameov=0;						//making everything initialize again
+			life=3;
+			lifeufo=3;
+			lifeufo2=1;
+			shoot=50;
+			score=0;
+			now[0]=160;
+			now[1]=220;
+			spos[0]=0;
+			spos[1]=0;
+			Ufo.pos[0]=50;
+			Ufo.pos[1]=50;
+			Ufo2.pos[0]=100;
+			Ufo2.pos[1]=100;
+			Game_Init();
+			Lcd_Draw_Bar(0,0, 320,240, BACK_COLOR);
+			Key_Wait_Key_Pressed();
+		}
+		if (gamewin==1)
+		{
+			Lcd_Draw_BMP(0,0, youwin);
+			Timer3_Buzzer_Beep(E1,N8);
+			Timer3_Buzzer_Beep(E1,N8);
+			Timer3_Buzzer_Beep(E1,N8);
+			Timer3_Buzzer_Beep(C1,N8);
+			Timer3_Buzzer_Beep(E1,N8);
+			Timer3_Buzzer_Beep(G1,N8);
+			gamewin=0;					//making everything initialize again
+			life=3;
+			lifeufo=3;
+			lifeufo2=1;
+			shoot=50;
+			score=0;
+			now[0]=160;
+			now[1]=220;
+			spos[0]=0;
+			spos[1]=0;
+			Ufo.pos[0]=50;
+			Ufo.pos[1]=50;
+			Ufo2.pos[0]=100;
+			Ufo2.pos[1]=100;
+			Game_Init();
+			Lcd_Draw_Bar(0,0, 320,240, BACK_COLOR);
+			Key_Wait_Key_Pressed();
+		}
+
+	}
+
+}
+
+//This is what initial looks like
+void Game_Init(void)
+{
+	Lcd_Clr_Screen(BACK_COLOR);
+
+	Timer0_Repeat(20);
+}
+
+//The moving parts
+
+void Moveufo(void)
+{
+	Lcd_Printf(1,1,RED,BLUE,1,1, "LIFE %d", life);
+	Lcd_Printf(200,2,RED,BLUE,1,1, "MISSILES %d", shoot);
+	Lcd_Printf(100,2,RED,BLUE,1,1, "SCORE %d", score);
+
+	if(Timer0_Check_Expired())
+	{
+			int key;
+			key=Key_Get_Pressed();
+			Timer4_Delay(80);
+			stimer++;
+			Ufo.timer++;
+			Ufo2.timer++;
+
+			//tank control
+
+			if (key==2) //left
+			{
+				now_pre[0] = now[0];
+				now_pre[1] = now[1];
+
+				now[0] = now[0] - move_step;
+				move_flag = 1; //the value changed (the val changes)
+
+			}
+
+			if(key==4)//right
+			{
+
+				now_pre[0] = now[0];
+				now_pre[1] = now[1];
+				now[0] = now[0] + move_step;
+				move_flag = 1; //the value changed (the val changes and I signal it to be changed and printed)
+
+			}
+
+			if (key==1) //up
+			{
+				now_pre[0] = now[0];
+				now_pre[1] = now[1];
+				now[1] = now[1] - move_step;
+				move_flag = 1; //the value changed (the val changes)
+
+			}
+
+			if(key==3)//down
+			{
+				now_pre[0] = now[0];
+				now_pre[1] = now[1];
+				now[1] = now[1] + move_step;
+				move_flag = 1; //the value changed (the val changes and I signal it to be changed and printed)
+
+			}
+
+			if(key==5) //shoot missiles
+			{
+				if (scnt==0)
+				{
+					shoot--;
+					Lcd_Printf(200,2,RED,BLUE,1,1, "MISSILES %d", shoot);
+					spos[1]= now[1] - 5;
+					spos[0]= now[0] + 10;
+					smoveflag=1;
+					scnt=1;
+
+					Uart_Printf("missile x and y %d %d\n", spos[0],spos[1]);
+					Uart_Printf("Ufo x and y %d %d\n", Ufo.pos[0], Ufo.pos[1]);
+
+					if( ( ((spos[0]+ssiz[0])>=Ufo.pos[0])&&((spos[0])<= (Ufo.pos[0]+Ufo.size[0])) )&& (  ((spos[1]+ssiz[1])>=Ufo.pos[1])&& ((spos[1])<=(Ufo.pos[1]+Ufo.size[1]))     )  )
+					{
+						Uart_Printf("missile x and y %d %d\n", spos[0],spos[1]);
+						Uart_Printf("Ufo x and y %d %d\n", Ufo.pos[0], Ufo.pos[1]);
+
+						Lcd_Draw_Bar(sprepose[0], sprepose[1], sprepose[0] + ssiz[0], sprepose[1] + ssiz[1], BACK_COLOR);
+						Lcd_Draw_Bar(spos[0], spos[1], spos[0] + ssiz[0], spos[1] + ssiz[1], BACK_COLOR);
+						smoveflag=0;
+						Timer3_Buzzer_Beep(C1,N2);
+						score+=100;
+						Lcd_Printf(100,2 ,RED,BLUE,1,1, "SCORE %d", score);
+						scnt=0;
+						lifeufo--;
+					}
+					if( ( ((spos[0]+ssiz[0])>=Ufo2.pos[0])&&((spos[0])<= (Ufo2.pos[0]+Ufo2.size[0])) )&& (  ((spos[1]+ssiz[1])>=Ufo2.pos[1])&& ((spos[1])<=(Ufo2.pos[1]+Ufo2.size[1]))     )  )
+					{
+						Lcd_Draw_Bar(sprepose[0], sprepose[1], sprepose[0] + ssiz[0], sprepose[1] + ssiz[1], BACK_COLOR);
+						Lcd_Draw_Bar(spos[0], spos[1], spos[0] + ssiz[0], spos[1] + ssiz[1], BACK_COLOR);
+						smoveflag=0;
+						Timer3_Buzzer_Beep(C1,N2);
+						score+=100;
+						Lcd_Printf(100,2,RED,BLUE,1,1, "SCORE %d", score);
+						scnt=0;
+						lifeufo2--;
+					}
+				}
+			}
+
+			if((stimer>=sspeed)&&(scnt!=0)) //controls the speed of my missile
+			{
+				stimer = 0;
+				sprepose[0]=spos[0];
+				sprepose[1]=spos[1];
+				spos[1] = spos[1] - smovestep;
+				smoveflag=1;
+				//when missile hits UFO
+				if( ( ((spos[0]+ssiz[0])>=Ufo.pos[0])&&((spos[0])<= (Ufo.pos[0]+Ufo.size[0])) )&& (  ((spos[1]+ssiz[1])>=Ufo.pos[1])&& ((spos[1])<=(Ufo.pos[1]+Ufo.size[1]))     )  )
+				{
+					Lcd_Draw_Bar(sprepose[0], sprepose[1], sprepose[0] + ssiz[0], sprepose[1] + ssiz[1], BACK_COLOR);
+					Lcd_Draw_Bar(spos[0], spos[1], spos[0] + ssiz[0], spos[1] + ssiz[1], BACK_COLOR);
+					smoveflag=0;
+					Timer3_Buzzer_Beep(A1,N16);
+					Timer3_Buzzer_Beep(B1,N16);
+					Timer3_Buzzer_Beep(C2,N16);
+					score+=100;
+					Lcd_Printf(100,2,RED,BLUE,1,1, "SCORE %d", score);
+					scnt=0;
+					lifeufo--;
+				}
+				if( ( ((spos[0]+ssiz[0])>=Ufo2.pos[0])&&((spos[0])<= (Ufo2.pos[0]+Ufo.size[0])) )&& (  ((spos[1]+ssiz[1])>=Ufo2.pos[1])&& ((spos[1])<=(Ufo2.pos[1]+Ufo.size[1]))     )  )
+				{
+
+					Uart_Printf("missile x and y %d %d\n", spos[0],spos[1]);
+					Uart_Printf("Ufo x and y %d %d\n", Ufo2.pos[0], Ufo2.pos[1]);
+
+					Lcd_Draw_Bar(sprepose[0], sprepose[1], sprepose[0] + ssiz[0], sprepose[1] + ssiz[1], BACK_COLOR);
+					Lcd_Draw_Bar(spos[0], spos[1], spos[0] + ssiz[0], spos[1] + ssiz[1], BACK_COLOR);
+					smoveflag=0;
+					Timer3_Buzzer_Beep(A1,N16);
+					Timer3_Buzzer_Beep(B1,N16);
+					Timer3_Buzzer_Beep(C2,N16);
+					score+=100;
+					Lcd_Printf(100,2,RED,BLUE,1,1, "SCORE %d", score);
+					scnt=0;
+					lifeufo2--;
+				}
+			}
+
+
+		 // like Ufo_timer <= same thing
+
+		if((Ufo.timer >= Ufo.speed_step)&&(lifeufo>0))
+		{
+			if(ufomoveit==0)
+			{
+				Ufo.timer = 0;
+				Ufo.pos_back[0] = Ufo.pos[0];
+				Ufo.pos[0] = Ufo.pos[0] + Ufo.move_step;
+			}
+			else
+			{
+				Ufo.timer = 0;
+				Ufo.pos_back[0] = Ufo.pos[0];
+				Ufo.pos[0] = Ufo.pos[0] - Ufo.move_step;
+
+			}
+
+			if(ufomoveit2==0)
+			{
+				Ufo.timer = 0;
+				Ufo.pos_back[1] = Ufo.pos[1];
+				Ufo.pos[1] = Ufo.pos[1] + Ufo.move_step;
+
+			}
+			else
+			{
+				Ufo.timer = 0;
+				Ufo.pos_back[1] = Ufo.pos[1];
+				Ufo.pos[1] = Ufo.pos[1] - Ufo.move_step;
+			}
+
+			Ufo.move_flag = 1;
+
+		}
+
+		//Ufo2 moving
+
+		if((Ufo2.timer >= Ufo2.speed_step)&&(lifeufo2>0))
+			{
+
+			if(ufo2moveit==1)
+			{
+				Ufo2.timer = 0;
+				Ufo2.pos_back[0] = Ufo2.pos[0];
+				Ufo2.pos[0] = Ufo2.pos[0] - Ufo2.move_step;
+			}
+			else
+			{
+				Ufo2.timer = 0;
+				Ufo2.pos_back[0] = Ufo2.pos[0];
+				Ufo2.pos[0] = Ufo2.pos[0] + Ufo2.move_step;
+
+			}
+
+			if(ufo2moveit2==1)
+			{
+				Ufo2.timer = 0;
+				Ufo2.pos_back[1] = Ufo2.pos[1];
+				Ufo2.pos[1] = Ufo2.pos[1] - Ufo2.move_step;
+
+			}
+			else
+			{
+				Ufo2.timer = 0;
+				Ufo2.pos_back[1] = Ufo2.pos[1];
+				Ufo2.pos[1] = Ufo2.pos[1] + Ufo2.move_step;
+			}
+
+			Ufo2.move_flag = 1;
+
+		}
+
+	}
+
+}
+
+//This makes everything appear on screen
+
+void Drawufo(void)
+{
+
+	//tank is moving (tank limits)
+
+	if((now[0] >= 318))
+	{
+		now[0] = now[0]-20;
+	}
+	else if((now[0] <= 0))
+	{
+		now[0] = 0;
+	}
+
+	if((now[1] >= 229))
+	{
+		now[1] = now[1]-20;
+	}
+	else if((now[1] <= 15))
+	{
+		now[1] = 0;
+	}
+
+	//This is where UFO is moving
+
+	if((Ufo.pos[0] >= WIDTH-45))
+	{
+		ufomoveit=1;
+		ufoini();
+		a++;
+		if (a>=4) a=0;
+	}
+	else if((Ufo.pos[0] <= 0))
+	{
+		ufomoveit=0;
+		ufoini();
+		a++;
+		if (a>=4) a=0;
+	}
+
+	if((Ufo.pos[1] >= HEIGHT-30))
+	{
+		ufomoveit2=1;
+		ufoini();
+		a++;
+		if (a>=4) a=0;
+	}
+	else if((Ufo.pos[1] <= 40))
+	{
+		ufomoveit2=0;
+		ufoini();
+		a++;
+		if (a>=4) a=0;
+	}
+
+	//this is where ufo2 is moving
+
+	if((Ufo2.pos[0] >= WIDTH-45))
+	{
+		ufo2moveit=1;
+		Ufo2.speed_step=3;
+		b++;
+		if (b>=4) b=0;
+	}
+	else if((Ufo2.pos[0] <= 0))
+	{
+		ufo2moveit=0;
+		Ufo2.speed_step=4;
+		b++;
+		if (b>=4) b=0;
+	}
+
+	if((Ufo2.pos[1] >= HEIGHT-30))
+	{
+		ufo2moveit2=1;
+		Ufo2.speed_step=6;
+		b++;
+		if (b>=4) b=0;
+	}
+	else if((Ufo2.pos[1] <= 40))
+	{
+		ufo2moveit2=0;
+		Ufo2.speed_step=3;
+		b++;
+		if (b>=4) b=0;
+	}
+
+	//when missile hits the top
+
+	if(spos[1]<=15) // x-position is important, too
+	{
+		scnt=0;
+		smoveflag=0;
+		Lcd_Draw_Bar(sprepose[0], sprepose[1], sprepose[0] + ssiz[0], sprepose[1] + ssiz[1], BACK_COLOR);
+	}
+
+
+	//when ufo1 and 2 hits tank
+
+	if (  ((now[0]+size[0])>=Ufo.pos[0])&&(now[0]<=(Ufo.pos[0]+Ufo.size[0]))&&  ((now[1]+size[1])>=Ufo.pos[1])&&(now[1]<=(Ufo.pos[1]+Ufo.size[1])) )
+	//if (  ((now[0])>=Ufo.pos[0])&&(now[0]<=(Ufo.pos[0]+Ufo.size[0]))&&  (now[1]>=Ufo.pos[1])&&(now[1]<=(Ufo.pos[1]+Ufo.size[1])) )
+	{
+		life--;
+		Lcd_Printf(1,1,RED,BLUE,1,1, "LIFE %d", life);
+		Timer3_Buzzer_Beep(C1,N2);
+
+		Lcd_Draw_Bar(now[0], now[1], now[0] + size[0], now[1] + size[1], BACK_COLOR);
+		now[0]=160;
+		now[1]=220;
+		Lcd_Draw_BMP(now[0], now[1], tankp);
+
+		Lcd_Draw_Bar(Ufo.pos[0], Ufo.pos[1], Ufo.pos[0] + Ufo.size[0], Ufo.pos[1] + Ufo.size[1], BACK_COLOR);
+		Ufo.pos[0]=200;
+		Ufo.pos[1]=100;
+		Lcd_Draw_BMP(Ufo.pos[0], Ufo.pos[1], Ufoim[a]);
+
+	}
+
+	if (  ((now[0]+size[0])>=Ufo2.pos[0])&&(now[0]<=(Ufo2.pos[0]+Ufo2.size[0]))&&  ((now[1]+size[1])>=Ufo2.pos[1])&&(now[1]<=(Ufo2.pos[1]+Ufo2.size[1])) )
+	//if (  ((now[0])>=Ufo2.pos[0])&&(now[0]<=(Ufo2.pos[0]+Ufo2.size[0]))&&  ((now[1])>=Ufo2.pos[1])&&(now[1]<=(Ufo2.pos[1]+Ufo2.size[1])) )
+	{
+		life--;
+		Lcd_Printf(1,1,RED,BLUE,1,1, "LIFE %d", life);
+		Timer3_Buzzer_Beep(C1,N2);
+
+		Lcd_Draw_Bar(now[0], now[1], now[0] + size[0], now[1] + size[1], BACK_COLOR);
+		now[0]=160;
+		now[1]=220;
+		Lcd_Draw_BMP(now[0], now[1], tankp);
+
+		Lcd_Draw_Bar(Ufo2.pos[0], Ufo2.pos[1], Ufo2.pos[0] + Ufo2.size[0], Ufo2.pos[1] + Ufo2.size[1], BACK_COLOR);
+		Ufo2.pos[0]=200;
+		Ufo2.pos[1]=100;
+		Lcd_Draw_BMP(Ufo2.pos[0], Ufo2.pos[1], Ufo2im[b]);
+
+	}
+
+	//printing what the screen looks like
+
+		// tank moving
+	if(move_flag != 0)
+	{
+		Lcd_Draw_Bar(now_pre[0], now_pre[1], now_pre[0] + size[0], now_pre[1] + size[1], BACK_COLOR);
+		Lcd_Draw_BMP(now[0], now[1], tankp);
+		move_flag = 0;
+	}
+		//shooting moving
+	if(smoveflag != 0)
+	{
+		Lcd_Draw_Bar(sprepose[0], sprepose[1], sprepose[0] + ssiz[0], sprepose[1] + ssiz[1], BACK_COLOR);
+		Lcd_Draw_Bar(spos[0], spos[1], spos[0] + ssiz[0], spos[1] + ssiz[1], scolor);
+		move_flag = 0;
+	}
+		//Ufo moving
+	if(Ufo.move_flag != 0)
+	{
+		Lcd_Draw_Bar(Ufo.pos_back[0], Ufo.pos_back[1], Ufo.pos_back[0] + Ufo.size[0], Ufo.pos_back[1] + Ufo.size[1], BACK_COLOR);
+		Lcd_Draw_BMP(Ufo.pos[0], Ufo.pos[1], Ufoim[a]);
+		Ufo.move_flag = 0;
+
+	}
+	if (lifeufo==0)
+	{
+		Lcd_Draw_Bar(Ufo.pos[0], Ufo.pos[1], Ufo.pos[0] + Ufo.size[0], Ufo.pos[1] + Ufo.size[1], BACK_COLOR);
+		Ufo.pos[0]=-250;
+		Ufo.pos[1]=-250;
+	}
+
+		//ufo2 moving
+
+	if(Ufo2.move_flag != 0)
+	{
+		Lcd_Draw_Bar(Ufo2.pos_back[0], Ufo2.pos_back[1], Ufo2.pos_back[0] + Ufo2.size[0], Ufo2.pos_back[1] + Ufo2.size[1], BACK_COLOR);
+		Lcd_Draw_BMP(Ufo2.pos[0], Ufo2.pos[1], Ufo2im[b]);
+		Ufo2.move_flag = 0;
+	}
+
+	if (lifeufo2==0)
+	{
+		Lcd_Draw_Bar(Ufo2.pos[0], Ufo2.pos[1], Ufo2.pos[0] + Ufo2.size[0], Ufo2.pos[1] + Ufo2.size[1], BACK_COLOR);
+		Ufo2.pos[0]=-250;
+		Ufo2.pos[1]=-250;
+	}
+
+	if((lifeufo==0)&&(lifeufo2==0)) gamewin=1 ;
+
+	if ((life==0)||(shoot==0)) gameov=1;
+
+
+
+}
+
+//this is the Ufo initializer (it changes everything into random initializing step)
+
+void ufoini(void)
+{
+	int i;
+	for(i=0;i<10;i++)
+	{
+		rand();
+		Ufo.speed_step=(rand()%9+1);
+	}
+
+}
+
+
